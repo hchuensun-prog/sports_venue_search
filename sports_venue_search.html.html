@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>台灣運動場館查詢系統（Google 地圖導航）</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: "Microsoft JhengHei", Arial, sans-serif;
+      background: #f0f4f8;
+      color: #2c3e50;
+      padding: 20px;
+      line-height: 1.6;
+    }
+    .container {
+      max-width: 1200px;
+      margin: auto;
+    }
+    h1 {
+      text-align: center;
+      color: #2c3e50;
+      margin-bottom: 20px;
+      font-size: 28px;
+    }
+    .filters {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 15px;
+      margin-bottom: 20px;
+      padding: 15px;
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+    .filter-group {
+      flex: 1;
+      min-width: 200px;
+    }
+    label {
+      display: block;
+      margin-bottom: 6px;
+      font-weight: bold;
+      color: #34495e;
+    }
+    select, input[type="text"] {
+      width: 100%;
+      padding: 10px;
+      border: 1px solid #bdc3c7;
+      border-radius: 8px;
+      font-size: 16px;
+    }
+    button {
+      padding: 10px 20px;
+      background: #3498db;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 16px;
+      margin-top: 10px;
+    }
+    button:hover {
+      background: #2980b9;
+    }
+    .count {
+      text-align: right;
+      margin: 15px 0;
+      color: #7f8c8d;
+      font-weight: bold;
+    }
+
+    /* 結果卡片 */
+    .results {
+      display: grid;
+      gap: 20px;
+    }
+    .venue-card {
+      background: #fff;
+      border-radius: 12px;
+      padding: 18px;
+      box-shadow: 0 3px 10px rgba(0,0,0,0.08);
+      border-left: 5px solid #27ae60;
+      transition: all 0.3s ease;
+    }
+    .venue-card:hover {
+      box-shadow: 0 6px 16px rgba(0,0,0,0.15);
+      transform: translateY(-2px);
+    }
+
+    /* 主欄位 */
+    .main-fields {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 12px;
+      margin-bottom: 15px;
+    }
+    .field {
+      font-size: 14px;
+    }
+    .field-label {
+      font-weight: bold;
+      color: #2c3e50;
+      display: block;
+      margin-bottom: 3px;
+    }
+    .field-value {
+      color: #555;
+      word-break: break-word;
+    }
+    .field-value a {
+      color: #e74c3c;
+      text-decoration: none;
+      font-weight: bold;
+    }
+    .field-value a:hover {
+      text-decoration: underline;
+    }
+
+    /* Google 地圖按鈕 */
+    .map-btn {
+      display: inline-block;
+      background: #4285f4;
+      color: white;
+      padding: 8px 16px;
+      border-radius: 6px;
+      text-decoration: none;
+      font-size: 14px;
+      margin-top: 10px;
+      transition: background 0.3s;
+    }
+    .map-btn:hover {
+      background: #3367d6;
+    }
+    .map-btn::before {
+      content: "Location ";
+      font-weight: bold;
+    }
+
+    /* 展開按鈕 */
+    .toggle-btn {
+      background: #ecf0f1;
+      color: #2c3e50;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+      margin-top: 15px;
+    }
+    .toggle-btn:hover {
+      background: #d5dbdb;
+    }
+
+    /* 額外欄位 */
+    .extra-fields {
+      display: none;
+      margin-top: 15px;
+      padding-top: 15px;
+      border-top: 1px dashed #bdc3c7;
+      font-size: 14px;
+    }
+    .extra-fields.show {
+      display: block;
+      animation: fadeIn 0.3s ease;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
+    /* 分頁 */
+    .pagination {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 8px;
+      margin: 30px 0;
+      flex-wrap: wrap;
+    }
+    .page-btn {
+      padding: 8px 12px;
+      border: 1px solid #bdc3c7;
+      background: white;
+      color: #2c3e50;
+      cursor: pointer;
+      border-radius: 6px;
+      font-size: 14px;
+    }
+    .page-btn:hover {
+      background: #f8f9fa;
+    }
+    .page-btn.active {
+      background: #27ae60;
+      color: white;
+      border-color: #27ae60;
+    }
+    .page-btn:disabled {
+      color: #95a5a6;
+      cursor: not-allowed;
+      background: #ecf0f1;
+    }
+
+    .no-data {
+      text-align: center;
+      padding: 60px 20px;
+      color: #95a5a6;
+      font-size: 18px;
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <h1>台灣運動場館查詢系統</h1>
+
+  <div class="filters">
+    <div class="filter-group">
+      <label for="city">縣市</label>
+      <select id="city" onchange="updateDistricts()">
+        <option value="">全部</option>
+      </select>
+    </div>
+    <div class="filter-group">
+      <label for="district">行政區</label>
+      <select id="district">
+        <option value="">全部</option>
+      </select>
+    </div>
+    <div class="filter-group">
+      <label for="keyword">關鍵字搜尋</label>
+      <input type="text" id="keyword" placeholder="場館名稱、設施、地址..." />
+    </div>
+    <div class="filter-group">
+      <button onclick="filterData()">查詢</button>
+    </div>
+  </div>
+
+  <div class="count">共 <span id="result-count">0</span> 筆資料</div>
+
+  <div class="results" id="results-container"></div>
+
+  <div class="pagination" id="pagination"></div>
+</div>
+
+<script>
+// === 台灣縣市與行政區 ===
+const cityDistrictMap = {
+  "臺北市": ["中正區","大同區","中山區","松山區","大安區","萬華區","信義區","士林區","北投區","內湖區","南港區","文山區"],
+  "新北市": ["板橋區","三重區","中和區","永和區","新莊區","新店區","土城區","蘆洲區","樹林區","汐止區","鶯歌區","三峽區"],
+  "桃園市": ["桃園區","中壢區","平鎮區","八德區","楊梅區","蘆竹區","大溪區","龍潭區","龜山區","大園區"],
+  "臺中市": ["中區","東區","南區","西區","北區","北屯區","西屯區","南屯區","太平區","大里區","霧峰區","豐原區"],
+  "臺南市": ["中西區","東區","南區","北區","安平區","安南區","永康區","歸仁區","新化區","善化區"],
+  "高雄市": ["楠梓區","左營區","鼓山區","三民區","鹽埕區","前金區","新興區","苓雅區","前鎮區","旗津區","小港區","鳳山區"],
+  "基隆市": ["仁愛區","中正區","信義區","中山區","安樂區","暖暖區","七堵區"],
+  "新竹市": ["東區","北區","香山區"],
+  "新竹縣": ["竹北市","竹東鎮","新埔鎮","關西鎮","湖口鄉"],
+  "苗栗縣": ["苗栗市","頭份市","苑裡鎮","通霄鎮","竹南鎮"],
+  "彰化縣": ["彰化市","員林市","和美鎮","鹿港鎮","溪湖鎮"],
+  "南投縣": ["南投市","埔里鎮","草屯鎮","竹山鎮"],
+  "雲林縣": ["斗六市","虎尾鎮","北港鎮","土庫鎮"],
+  "嘉義市": ["東區","西區"],
+  "嘉義縣": ["太保市","朴子市","布袋鎮","大林鎮"],
+  "屏東縣": ["屏東市","潮州鎮","東港鎮","恆春鎮"],
+  "宜蘭縣": ["宜蘭市","羅東鎮","蘇澳鎮","頭城鎮"],
+  "花蓮縣": ["花蓮市","鳳林鎮","玉里鎮","新城鄉"],
+  "臺東縣": ["臺東市","成功鎮","關山鎮"],
+  "澎湖縣": ["馬公市","湖西鄉","白沙鄉"],
+  "金門縣": ["金城鎮","金沙鎮","金湖鎮"],
+  "連江縣": ["南竿鄉","北竿鄉"]
+};
+
+// 初始化縣市
+const citySelect = document.getElementById("city");
+Object.keys(cityDistrictMap).forEach(city => {
+  const opt = document.createElement("option");
+  opt.value = city; opt.textContent = city;
+  citySelect.appendChild(opt);
+});
+
+function updateDistricts() {
+  const city = citySelect.value;
+  const districtSelect = document.getElementById("district");
+  districtSelect.innerHTML = '<option value="">全部</option>';
+  if (city && cityDistrictMap[city]) {
+    cityDistrictMap[city].forEach(d => {
+      const opt = document.createElement("option");
+      opt.value = d; opt.textContent = d;
+      districtSelect.appendChild(opt);
+    });
+  }
+  filterData();
+}
+
+// === 隨機產生 100 筆資料 ===
+const venueTypes = ["綜合體育場", "籃球場", "羽球館", "游泳池", "網球場", "健身房", "棒球場", "足球場"];
+const agencies = ["教育局", "體育署", "國立大學", "縣立高中", "私人企業", "社區協會"];
+const owners = ["王小明", "李美玲", "張志豪", "陳雅婷", "劉建國", "黃淑芬", "林偉杰", "蔡佩珊"];
+const parkingTypes = ["室內停車場", "路邊停車", "無停車場", "收費停車場"];
+const openStatus = ["全年開放", "部分時段開放", "需預約", "賽事期間開放"];
+const events = ["全國運動會", "城市盃籃球賽", "校際羽球賽", "社區馬拉松", "無"];
+
+function randomChoice(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+function randomPhone() { return `0${Math.floor(9 * Math.random() + 1)}-${Math.floor(10000000 + Math.random() * 90000000)}`; }
+function randomYear() { return 1980 + Math.floor(Math.random() * 45); }
+function randomArea() { return Math.floor(500 + Math.random() * 50000); }
+
+function randomLatLng(city) {
+  const base = {
+    "臺北市": [25.0330, 121.5654], "新北市": [25.0166, 121.4620], "桃園市": [24.9895, 121.3140],
+    "臺中市": [24.1477, 120.6736], "臺南市": [22.9999, 120.2270], "高雄市": [22.6273, 120.3014],
+    "基隆市": [25.1276, 121.7392], "新竹市": [24.8138, 120.9675], "新竹縣": [24.8384, 121.0112],
+    "苗栗縣": [24.5602, 120.8218], "彰化縣": [24.0518, 120.5162], "南投縣": [23.9150, 120.6855],
+    "雲林縣": [23.7092, 120.4313], "嘉義市": [23.4800, 120.4496], "嘉義縣": [23.4589, 120.3233],
+    "屏東縣": [22.5519, 120.5480], "宜蘭縣": [24.7021, 121.7380], "花蓮縣": [23.9910, 121.6110],
+    "臺東縣": [22.7564, 121.1444], "澎湖縣": [23.5651, 119.5815], "金門縣": [24.4375, 118.3180],
+    "連江縣": [26.1555, 119.9440]
+  };
+  const [lat, lng] = base[city] || [23.5, 121];
+  return [lat + (Math.random() - 0.5) * 0.08, lng + (Math.random() - 0.5) * 0.08];
+}
+
+const data = [];
+const cities = Object.keys(cityDistrictMap);
+for (let i = 0; i < 100; i++) {
+  const city = randomChoice(cities);
+  const district = randomChoice(cityDistrictMap[city]);
+  const [lat, lng] = randomLatLng(city);
+  const name = `${district}${randomChoice(["國民運動中心", "體育場", "綜合運動館", "游泳館", "籃球館", "羽球場", "網球中心"])}`;
+  
+  data.push({
+    city, district, name,
+    type: randomChoice(venueTypes),
+    agency: randomChoice(agencies) + randomChoice(["", "體育處", "運動中心"]),
+    manager: randomChoice(owners),
+    phone: randomPhone(),
+    website: Math.random() > 0.7 ? `https://${name.replace(/\s/g,'').toLowerCase()}.tw` : "",
+    agencyType: randomChoice(["公立", "私立", "財團法人", "學校"]),
+    address: `${city}${district}${Math.floor(1+Math.random()*300)}號`,
+    lat: lat.toFixed(6), lng: lng.toFixed(6),
+    facilities: [randomChoice(["籃球", "羽球", "游泳", "健身", "桌球", "排球"]), randomChoice(["跑道", "攀岩", "瑜伽室"])].filter(Boolean).join("、"),
+    openStatus: randomChoice(openStatus),
+    openHours: Math.random() > 0.5 ? "06:00-22:00" : "平日08:00-21:00；假日07:00-20:00",
+    rental: Math.random() > 0.4 ? "可租借，需提前7天申請" : "僅供學校使用",
+    note: Math.random() > 0.7 ? "例假日及國定假日休館" : "",
+    parking: randomChoice(parkingTypes),
+    intro: `${name}提供多元運動設施，歡迎市民使用。`,
+    eventHistory: randomChoice(events),
+    eventDesc: Math.random() > 0.6 ? `曾舉辦${randomChoice(["2023城市盃", "全國中學生運動會", "企業團體賽"])}` : "",
+    openYear: randomYear(),
+    area: randomArea()
+  });
+}
+
+// === 欄位定義 ===
+const mainFields = [
+  { key: 'city', label: '縣市' },
+  { key: 'district', label: '行政區' },
+  { key: 'name', label: '場館名稱' },
+  { key: 'type', label: '分類' },
+  { key: 'agency', label: '隸屬機關' },
+  { key: 'manager', label: '管理人' },
+  { key: 'phone', label: '電話' },
+  { key: 'website', label: '網站', format: v => v ? `<a href="${v}" target="_blank">連結</a>` : '無' },
+  { key: 'address', label: '地址' },
+  { key: 'openStatus', label: '開放情形' }
+];
+
+const extraFields = [
+  { key: 'agencyType', label: '機關屬性' },
+  { key: 'lat', label: '緯度' },
+  { key: 'lng', label: '經度' },
+  { key: 'facilities', label: '設施項目' },
+  { key: 'openHours', label: '開放時間' },
+  { key: 'rental', label: '租借資訊' },
+  { key: 'note', label: '補充說明' },
+  { key: 'parking', label: '停車場' },
+  { key: 'intro', label: '介紹' },
+  { key: 'eventHistory', label: '賽事經歷' },
+  { key: 'eventDesc', label: '賽事說明' },
+  { key: 'openYear', label: '啟用年' },
+  { key: 'area', label: '面積(㎡)', format: v => v.toLocaleString() }
+];
+
+// === 分頁設定 ===
+const PAGE_SIZE = 10;
+let currentPage = 1;
+let filteredData = [];
+
+// === 建立 Google 地圖連結 ===
+function getGoogleMapsUrl(lat, lng, name) {
+  return `https://www.google.com/maps/search/?api=1&query=${lat},${lng}&query_place_id=${encodeURIComponent(name)}`;
+}
+
+// === 渲染卡片 ===
+function createCard(row) {
+  const card = document.createElement("div");
+  card.className = "venue-card";
+
+  const mainHTML = mainFields.map(f => `
+    <div class="field">
+      <div class="field-label">${f.label}</div>
+      <div class="field-value">${f.format ? f.format(row[f.key]) : row[f.key]}</div>
+    </div>
+  `).join('');
+
+  const extraHTML = extraFields.map(f => `
+    <div class="field">
+      <div class="field-label">${f.label}</div>
+      <div class="field-value">${f.format ? f.format(row[f.key]) : row[f.key]}</div>
+    </div>
+  `).join('');
+
+  const googleMapsUrl = getGoogleMapsUrl(row.lat, row.lng, row.name);
+
+  card.innerHTML = `
+    <div class="main-fields">${mainHTML}</div>
+    <a href="${googleMapsUrl}" target="_blank" class="map-btn">在 Google 地圖開啟</a>
+    <button class="toggle-btn" onclick="this.nextElementSibling.classList.toggle('show'); this.textContent = this.nextElementSibling.classList.contains('show') ? '收合 ↑' : '展開更多 ↓'">
+      展開更多 ↓
+    </button>
+    <div class="extra-fields">${extraHTML}</div>
+  `;
+
+  return card;
+}
+
+// === 渲染當前頁 ===
+function renderPage() {
+  const container = document.getElementById("results-container");
+  container.innerHTML = "";
+  const start = (currentPage - 1) * PAGE_SIZE;
+  const end = start + PAGE_SIZE;
+  const pageData = filteredData.slice(start, end);
+
+  if (pageData.length === 0) {
+    container.innerHTML = `<div class="no-data">查無符合條件的場館資料</div>`;
+  } else {
+    pageData.forEach(row => container.appendChild(createCard(row)));
+  }
+
+  renderPagination();
+}
+
+// === 分頁按鈕 ===
+function renderPagination() {
+  const totalPages = Math.ceil(filteredData.length / PAGE_SIZE);
+  const pagination = document.getElementById("pagination");
+  pagination.innerHTML = "";
+
+  const prev = document.createElement("button");
+  prev.className = "page-btn";
+  prev.textContent = "上一頁";
+  prev.disabled = currentPage === 1;
+  prev.onclick = () => { currentPage--; renderPage(); };
+  pagination.appendChild(prev);
+
+  const maxBtns = 5;
+  let startPage = Math.max(1, currentPage - Math.floor(maxBtns / 2));
+  let endPage = Math.min(totalPages, startPage + maxBtns - 1);
+  if (endPage - startPage + 1 < maxBtns) startPage = Math.max(1, endPage - maxBtns + 1);
+
+  if (startPage > 1) {
+    addPageBtn(1);
+    if (startPage > 2) pagination.appendChild(document.createTextNode(" ... "));
+  }
+
+  for (let i = startPage; i <= endPage; i++) addPageBtn(i);
+
+  if (endPage < totalPages) {
+    if (endPage < totalPages - 1) pagination.appendChild(document.createTextNode(" ... "));
+    addPageBtn(totalPages);
+  }
+
+  const next = document.createElement("button");
+  next.className = "page-btn";
+  next.textContent = "下一頁";
+  next.disabled = currentPage === totalPages;
+  next.onclick = () => { currentPage++; renderPage(); };
+  pagination.appendChild(next);
+
+  function addPageBtn(num) {
+    const btn = document.createElement("button");
+    btn.className = "page-btn" + (num === currentPage ? " active" : "");
+    btn.textContent = num;
+    btn.onclick = () => { currentPage = num; renderPage(); };
+    pagination.appendChild(btn);
+  }
+}
+
+// === 篩選 ===
+function filterData() {
+  const city = document.getElementById("city").value;
+  const district = document.getElementById("district").value;
+  const keyword = document.getElementById("keyword").value.toLowerCase().trim();
+
+  filteredData = data;
+
+  if (city) filteredData = filteredData.filter(d => d.city === city);
+  if (district) filteredData = filteredData.filter(d => d.district === district);
+  if (keyword) {
+    filteredData = filteredData.filter(d =>
+      Object.values(d).some(v => String(v).toLowerCase().includes(keyword))
+    );
+  }
+
+  document.getElementById("result-count").textContent = filteredData.length;
+  currentPage = 1;
+  renderPage();
+}
+
+// === 初始化 ===
+filterData();
+</script>
+
+</body>
+</html>
